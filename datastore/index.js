@@ -3,21 +3,76 @@ const path = require('path');
 const _ = require('underscore');
 const counter = require('./counter');
 
+const Promise = require('bluebird');
+const readFilePromise = Promise.promisify(fs.readFile);
 var items = {};
 
 // Public API - Fix these CRUD functions ///////////////////////////////////////
 
 exports.create = (text, callback) => {
-  var id = counter.getNextUniqueId();
-  items[id] = text;
-  callback(null, { id, text });
+  counter.getNextUniqueId((err, id) => {
+    if (err) {
+      throw (err);
+    } else {
+      fs.writeFile(exports.dataDir + '/' + id + '.txt', text, (err) => {
+        if (err) {
+          throw ('error writing file');
+        } else {
+          callback(null, { id, text });
+        }
+      });
+    }
+  });
+
+  // items[id] = text;
+  // callback(null, { id, text });
 };
 
 exports.readAll = (callback) => {
-  var data = _.map(items, (text, id) => {
-    return { id, text };
+  fs.readdir(exports.dataDir, (err, files) => {
+    if (err) {
+      return callback(err);
+    }
+    var data = _.map(files, (file) => {
+      var id = path.basename(file, '.txt');
+      var filepath = path.join(exports.dataDir, file);
+      return readFilePromise(filepath).then((fileData) => {
+        return {
+          id: id,
+          text: fileData.toString()
+        };
+      });
+    });
+    Promise.all(data)
+      .then((items) => {
+        callback(null, items);
+      });
+
   });
-  callback(null, data);
+  // fs.readdir(exports.dataDir + '/', (err, items) => {
+  //   debugger;
+  //   items.forEach((text, id) => {
+
+  //     fs.readFile('./' + text, (err, fileData) => {
+  //       debugger;
+  //       if (err) {
+  //         callback(null, 0);
+  //       } else {
+  //         // return { id: textID, text: text.slice(0, -4) };
+  //         callback(null, fileData);
+  //         data[text] = fileData;
+  //       }
+  //     });
+
+  //     // textID = (id + 100001).toString().slice(1);
+  //     // let textWeWant = ;
+  //     // return { id: textID, text: text.slice(0, -4) };
+  //   });
+  //   // done();
+  //   // callback(null, data);
+  // });
+
+  // callback(null, data);
 };
 
 exports.readOne = (id, callback) => {
